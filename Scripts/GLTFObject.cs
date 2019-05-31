@@ -5,55 +5,70 @@ using System.Linq;
 using UnityEngine;
 
 namespace Siccity.GLTFUtility {
-    public enum GLType { UNSET = -1, BYTE = 5120, UNSIGNED_BYTE = 5121, SHORT = 5122, UNSIGNED_SHORT = 5123, FLOAT = 5126 }
+    public enum GLType { UNSET = -1, BYTE = 5120, UNSIGNED_BYTE = 5121, SHORT = 5122, UNSIGNED_SHORT = 5123, UNSIGNED_INT = 5125, FLOAT = 5126 }
 
     [Serializable]
     public class GLTFObject {
 
-        /// <summary> Default scene </summary>
-        int scene = -1;
+#region Serialized fields
+        public int scene = -1;
         public List<GLTFScene> scenes;
         public List<GLTFNode> nodes;
         public List<GLTFMesh> meshes;
+        public List<GLTFAnimation> animations;
         public List<GLTFBuffer> buffers;
         public List<GLTFBufferView> bufferViews;
         public List<GLTFAccessor> accessors;
         public List<GLTFSkin> skins;
+        public List<GLTFTexture> textures;
+        public List<GLTFImage> images;
+        public List<GLTFMaterial> materials;
+#endregion
 
-        public GameObject Create(string directoryRoot) {
-            // Read buffers
-            for (int i = 0; i < buffers.Count; i++) {
-                buffers[i].Read(directoryRoot);
-            }
+#region Non-serialized fields
+        public bool loaded { get; private set; }
+        public string directoryRoot { get; private set; }
+        public string mainFile { get; private set; }
+#endregion
+
+        public GameObject[] Create() {
 
             // Get root node indices from scenes
             int[] rootNodes = scenes.SelectMany(x => x.nodes).ToArray();
 
-            if (rootNodes.Length != 1) {
-                Debug.LogError("Only one root node is currently supported");
-                return null;
-            }
-
-            // Recursively construct transform hierarchy
-            Transform root = nodes[0].CreateTransform(this, null);
-
-            // Flip the entire node tree on the global Z axis
-            var worldTransforms = nodes.Where(x => x.transform != null).Select(x => new {
-                transform = x.transform, worldPos = x.transform.position, worldRot = x.transform.rotation,
-            }).ToArray();
-            for (int i = 0; i < worldTransforms.Length; i++) {
-                var x = worldTransforms[i];
-
-                // Reverse Z
-                x.transform.position = new Vector3(x.worldPos.x, x.worldPos.y, -x.worldPos.z);
-                x.transform.rotation = new Quaternion(-x.worldRot.x, -x.worldRot.y, x.worldRot.z, x.worldRot.w);
+            GameObject[] roots = new GameObject[rootNodes.Length];
+            for (int i = 0; i < rootNodes.Length; i++) {
+                // Recursively construct transform hierarchy
+                int nodeIndex = rootNodes[i];
+                roots[i] = nodes[nodeIndex].CreateTransform(null).gameObject;
             }
 
             // Setup mesh renderers and such
             for (int i = 0; i < nodes.Count; i++) {
-                nodes[i].SetupComponents(this);
+                nodes[i].SetupComponents();
             }
-            return root.gameObject;
+            return roots;
+        }
+
+        public void Load(string directoryRoot, string mainFile) {
+            if (loaded) {
+                Debug.LogWarning("GLTFObject already loaded");
+                return;
+            }
+            this.directoryRoot = directoryRoot;
+            this.mainFile = mainFile;
+            GLTFProperty.Load(this, buffers);
+            GLTFProperty.Load(this, bufferViews);
+            GLTFProperty.Load(this, accessors);
+            GLTFProperty.Load(this, images);
+            GLTFProperty.Load(this, textures);
+            GLTFProperty.Load(this, materials);
+            GLTFProperty.Load(this, scenes);
+            GLTFProperty.Load(this, nodes);
+            GLTFProperty.Load(this, meshes);
+            GLTFProperty.Load(this, animations);
+            GLTFProperty.Load(this, skins);
+            loaded = true;
         }
     }
 }

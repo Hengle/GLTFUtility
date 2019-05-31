@@ -7,19 +7,29 @@ using UnityEngine;
 namespace Siccity.GLTFUtility {
     /// <summary> Defines sections within the Buffer </summary>
     [Serializable]
-    public class GLTFBufferView {
+    public class GLTFBufferView : GLTFProperty {
+
+#region Serialized fields
         public int buffer = -1;
         public int byteOffset = 0;
         public int byteLength = -1;
         public int byteStride = -1;
         /// <summary> OpenGL buffer target </summary>
         public int target = -1;
+#endregion
 
+#region Non-serialized fields
         private byte[] cache;
+#endregion
 
-        public byte[] GetBytes(GLTFObject gLTFObject) {
-            if (cache == null) cache = gLTFObject.buffers[buffer].GetBytes().SubArray(byteOffset, byteLength);
-            return cache;
+        protected override bool OnLoad() {
+            cache = glTFObject.buffers[buffer].GetBytes().SubArray(this.byteOffset, byteLength);
+            return true;
+        }
+
+        public byte[] GetBytes(int byteOffset = 0) {
+            if (byteOffset != 0) return cache.SubArray(byteOffset, byteLength - byteOffset);
+            else return cache;
         }
     }
 }
